@@ -1,29 +1,26 @@
+require('dotenv').config(); // Load environment variables first
 const express = require('express');
 const http = require('http');
 const path = require('path');
-require('dotenv').config();
+const { Server } = require('socket.io');
+const bcrypt = require('bcrypt');
+const { MongoClient, ObjectId } = require('mongodb'); // Import MongoClient here
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(express.json());
-app.use(express.static(path.join(__dirname, '.')));
-
-// For real time refresh per alarm updates
-const { Server } = require('socket.io');
-const ioServer = http.createServer(app);
-const io = new Server(ioServer);
-io.on('connection', socket => {
-  console.log('Client connected');
-});
-
-// For password hashing
-const bcrypt = require('bcrypt');
-
-//For Database connection
-const { MongoClient, ObjectId } = require('mongodb');
-const mongoUrl = process.env.MONGODB_URI;
+// --- Database Configuration ---
+// Check both common variable names (MONGODB_URI or MONGO_URI)
+const mongoUrl = process.env.MONGODB_URI || process.env.MONGO_URI;
 const dbName = 'school_alarm';
 let db;
+
+console.log("Attempting to connect with URL:", mongoUrl ? "Found (Hidden)" : "NOT FOUND (undefined)");
+
+if (!mongoUrl) {
+    console.error("CRITICAL ERROR: MongoDB connection string is missing in .env file.");
+    process.exit(1); // Stop the server if no DB URL
+}
 
 const client = new MongoClient(mongoUrl);
 
@@ -36,6 +33,17 @@ async function connectToMongo() {
         console.error('MongoDB connection error:', err.message || err);
     }
 }
+// ------------------------------
+
+app.use(express.json());
+app.use(express.static(path.join(__dirname, '.')));
+
+// For real time refresh per alarm updates
+const ioServer = http.createServer(app);
+const io = new Server(ioServer);
+io.on('connection', socket => {
+  console.log('Client connected');
+});
 
 function formatString(str) {
     const change = {
@@ -1012,7 +1020,7 @@ app.post('/user/change-password', async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Database error: ' + (err.message || err)
-        })
+        });
     }
 });
 
